@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+{% load static datavax_tags %}
+
+{% block title %}{{ share.title }} — DataVax{% endblock %}
+
+{% block extra_css %}
+{% if category == 'code' %}
+{% include 'includes/codemirror_assets.html' with mode='css' %}
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="share-detail-wrap">
+    <section class="card share-header-card">
+        <div class="share-title-row">
+            <div>
+                <h1 class="share-title">{{ share.title }}</h1>
+                {% if share.description %}
+                <p class="muted" style="margin-top:4px;white-space:pre-wrap;">{{ share.description }}</p>
+                {% endif %}
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                <span class="badge badge-accent">{{ share.asset.original_name|file_ext }}</span>
+                {% if share.has_password %}<span class="badge badge-warning">Защищён паролем</span>{% endif %}
+            </div>
+        </div>
+
+        <div class="share-meta-bar">
+            {% if share.is_anonymous or not share.user %}
+                <span>Автор: <strong>Аноним</strong></span>
+            {% else %}
+                <span>Автор: <a href="{% url 'accounts:profile' share.user.username %}" style="color:var(--accent);font-weight:600;">{{ share.user.username }}</a></span>
+            {% endif %}
+            <span>·</span>
+            <span class="mono">{{ share.asset.original_name }}</span>
+            <span>·</span>
+            <span class="mono">{{ share.asset.size|format_bytes }}</span>
+            <span>·</span>
+            <span>Создан: {{ share.created_at|date:"d.m.Y H:i" }}</span>
+            {% if share.expire_date %}
+                <span>·</span>
+                <span class="badge badge-warning">Истекает: {{ share.expire_date|date:"d.m.Y H:i" }}</span>
+            {% endif %}
+            <span>·</span>
+            <span class="mono">👁 {{ share.views_count }} · ↓ {{ share.downloads_count }}</span>
+        </div>
+
+        <div class="share-toolbar">
+            <a href="{% url 'shares:download' share.hash_id %}" class="btn btn-primary btn-sm">Скачать файл</a>
+            <button type="button" class="btn btn-sm" data-copy-text="{{ share_url }}">Копировать ссылку</button>
+
+            {% if category == 'code' or category == 'text' %}
+            <button type="button" id="copyContentBtn" class="btn btn-sm">Копировать текст</button>
+            {% endif %}
+
+            {% if request.user.is_authenticated %}
+            <button type="button" id="saveToDriveBtn" class="btn btn-sm" data-save-url="{% url 'shares:save_to_drive' share.hash_id %}">Сохранить на Диск</button>
+            <button type="button" id="likeShareBtn" class="btn btn-sm like-btn {% if user_liked %}active{% endif %}" data-like-url="{% url 'shares:like' share.hash_id %}">
+                ♥ <span id="likeShareCount">{{ like_count }}</span>
+            </button>
+            {% else %}
+            <span class="badge">♥ {{ like_count }}</span>
+            {% endif %}
+
+            <div style="margin-left:auto;display:flex;gap:8px;">
+                <button type="button" id="openReportModalBtn" class="btn btn-sm">Пожаловаться</button>
+                {% if can_delete %}
+                <button type="button" id="deleteShareBtn" class="btn btn-danger btn-sm" data-delete-url="{% url 'shares:delete' share.hash_id %}">Удалить</button>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+
+    <section class="card preview-box">
+        {% if category == 'image' %}
+            <img src="{% url 'shares:raw' share.hash_id %}" alt="{{ share.title }}">
+        {% elif category == 'video' %}
+            <video controls>
+                <source src="{% url 'shares:raw' share.hash_id %}" type="{{ share.asset.mime_type }}">
+            </video>
+        {% elif category == 'audio' %}
+            <audio controls>
+                <source src="{% url 'shares:raw' share.hash_id %}" type="{{ share.asset.mime_type }}">
+            </audio>
+        {% elif category == 'pdf' %}
+            <iframe src="{% url 'shares:raw' share.hash_id %}" title="{{ share.title }}"></iframe>
+        {% elif category == 'code' %}
+            <div style="width:100%;">
+                {% if is_truncated %}
+                <div class="flash-banner warning" style="margin:12px;">Показаны первые 512 КБ файла.</div>
+                {% endif %}
+                <textarea id="shareCodePreview" data-mode="{{ code_language }}">{{ file_content }}</textarea>
+            </div>
+        {% elif category == 'text' %}
+            <div style="width:100%;">
+                {% if is_truncated %}
+                <div class="flash-banner warning" style="margin:12px;">Показаны первые 512 КБ файла.</div>
+                {% endif %}
+                <pre id="shareTextPreview" class="text-preview-pre">{{ file_content }}</pre>
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <div style="font-size:38px;">📦</div>
+                <strong style="color:var(--text);">{{ share.asset.original_name }}</strong>
+                <p class="mono" style="font-size:12px;">{{ share.asset.mime_type }} · {{ share.asset.size|format_bytes }}</p>
+                <a href="{% url 'shares:download' share.hash_id %}" class="btn btn-primary btn-sm">Скачать файл</a>
+            </div>
+        {% endif %}
+    </section>
+</div>
+
+<!-- Modal: Report Share -->
+<div id="reportModal" class="modal-backdrop">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3>Пожаловаться на файл</h3>
+            <button type="button" class="btn btn-sm btn-icon" data-close-modal="reportModal">✕</button>
+        </div>
+        <form id="reportForm" method="post" action="{% url 'shares:report' share.hash_id %}" style="display:flex;flex-direction:column;gap:12px;">
+            {% csrf_token %}
+            <div class="field-group">
+                <label class="field-label" for="reportReason">Причина</label>
+                <select id="reportReason" name="reason" class="select-field">
+                    {% for value, label in report_reasons %}
+                    <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field-group">
+                <label class="field-label" for="reportComment">Комментарий (необязательно)</label>
+                <textarea id="reportComment" name="comment" class="textarea-field" maxlength="500" placeholder="Опишите проблему..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-sm" data-close-modal="reportModal">Отмена</button>
+                <button type="submit" class="btn btn-danger btn-sm">Отправить жалобу</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if category == 'code' %}
+{% include 'includes/codemirror_assets.html' with mode='js' %}
+{% endif %}
+<script src="{% static 'js/share_detail.js' %}"></script>
+{% endblock %}

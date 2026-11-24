@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+{% load static datavax_tags %}
+
+{% block title %}{{ drive_file.name }} — Предпросмотр | DataVax{% endblock %}
+
+{% block extra_css %}
+{% if category == 'code' or category == 'text' %}
+{% include 'includes/codemirror_assets.html' with mode='css' %}
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="share-detail-wrap">
+    <div class="card share-header-card">
+        <div class="breadcrumbs">
+            {% for crumb in breadcrumbs %}
+                {% if not forloop.first %}<span class="muted">/</span>{% endif %}
+                <a href="{% url 'drive:folder' crumb.uuid %}" class="breadcrumb-link">{{ crumb.name }}</a>
+            {% endfor %}
+            <span class="muted">/</span>
+            <span class="breadcrumb-link current">{{ drive_file.name }}</span>
+        </div>
+
+        <div class="share-title-row">
+            <h1 class="share-title">{{ drive_file.name }}</h1>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                {% if category == 'code' or category == 'text' %}
+                    {% if not is_truncated %}
+                    <button type="button" id="saveDriveContentBtn" class="btn btn-primary btn-sm" data-save-url="{% url 'drive:save_file_content' drive_file.uuid %}">Сохранить изменения</button>
+                    {% endif %}
+                {% endif %}
+                <button type="button" id="openPreviewShareModalBtn" class="btn btn-sm">Поделиться</button>
+                <a href="{% url 'drive:download_file' drive_file.uuid %}" class="btn btn-sm">Скачать</a>
+            </div>
+        </div>
+
+        <div class="share-meta-bar mono">
+            <span>{{ drive_file.size|format_bytes }}</span>
+            <span>·</span>
+            <span>{{ drive_file.mime_type }}</span>
+            <span>·</span>
+            <span>Обновлён: {{ drive_file.updated_at|date:"d.m.Y H:i" }}</span>
+        </div>
+    </div>
+
+    <div class="card preview-box">
+        {% if category == 'image' %}
+            <img src="{% url 'drive:raw_file' drive_file.uuid %}" alt="{{ drive_file.name }}">
+        {% elif category == 'video' %}
+            <video controls>
+                <source src="{% url 'drive:raw_file' drive_file.uuid %}" type="{{ drive_file.mime_type }}">
+            </video>
+        {% elif category == 'audio' %}
+            <audio controls>
+                <source src="{% url 'drive:raw_file' drive_file.uuid %}" type="{{ drive_file.mime_type }}">
+            </audio>
+        {% elif category == 'pdf' %}
+            <iframe src="{% url 'drive:raw_file' drive_file.uuid %}" title="{{ drive_file.name }}"></iframe>
+        {% elif category == 'code' or category == 'text' %}
+            <div style="width:100%;">
+                {% if is_truncated %}
+                <div class="flash-banner warning" style="margin:12px;">Файл слишком велик — показаны первые 512 КБ (редактирование отключено).</div>
+                {% endif %}
+                <textarea id="driveCodeEditor" data-mode="{{ code_language }}">{{ file_content }}</textarea>
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <div style="font-size:34px;">📄</div>
+                <strong style="color:var(--text);">{{ drive_file.name }}</strong>
+                <p>Предпросмотр в браузере недоступен для этого формата.</p>
+                <a href="{% url 'drive:download_file' drive_file.uuid %}" class="btn btn-primary btn-sm">Скачать файл</a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<div id="previewShareModal" class="modal-backdrop">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3>Поделиться «{{ drive_file.name }}»</h3>
+            <button type="button" class="btn btn-sm btn-icon" data-close-modal="previewShareModal">✕</button>
+        </div>
+        <form id="previewShareForm" method="post" action="{% url 'drive:share_file' drive_file.uuid %}" style="display:flex;flex-direction:column;gap:12px;">
+            {% csrf_token %}
+            <div class="field-group">
+                <label class="field-label" for="previewShareTitle">Заголовок</label>
+                <input type="text" id="previewShareTitle" name="title" class="input-field" value="{{ drive_file.name }}" required>
+            </div>
+            <div class="field-group">
+                <label class="field-label" for="previewShareExpire">Срок действия</label>
+                <select id="previewShareExpire" name="expire_preset" class="select-field">
+                    <option value="1h">1 час</option>
+                    <option value="1d">1 день</option>
+                    <option value="1w" selected>1 неделя</option>
+                    <option value="1m">1 месяц</option>
+                    <option value="never">Бессрочно</option>
+                </select>
+            </div>
+            <div class="field-group">
+                <label class="field-label" for="previewSharePassword">Пароль (необязательно)</label>
+                <input type="password" id="previewSharePassword" name="password" class="input-field">
+            </div>
+            <div id="previewShareResult" class="hidden" style="display:flex;gap:6px;">
+                <input type="text" id="previewShareLink" class="input-field mono" readonly>
+                <button type="button" id="copyPreviewShareBtn" class="btn btn-sm">Копировать</button>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-sm" data-close-modal="previewShareModal">Закрыть</button>
+                <button type="submit" class="btn btn-primary btn-sm">Создать ссылку</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if category == 'code' or category == 'text' %}
+{% include 'includes/codemirror_assets.html' with mode='js' %}
+{% endif %}
+<script src="{% static 'js/drive_preview.js' %}"></script>
+{% endblock %}

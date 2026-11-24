@@ -1,0 +1,60 @@
+{% load static %}
+<header class="navbar">
+    <div class="navbar-inner">
+        <div style="display:flex;align-items:center;gap:18px;">
+            <a href="{% url 'core:home' %}" class="brand-link">
+                <img src="{% static 'images/logo.svg' %}" alt="DataVax" class="brand-logo">
+                <span>DataVax</span>
+                <span class="brand-badge">v2</span>
+            </a>
+
+            <nav class="nav-links">
+                <a href="{% url 'core:home' %}" class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}">Главная</a>
+                <a href="{% url 'drive:root' %}" class="nav-link {% if request.resolver_match.app_name == 'drive' %}active{% endif %}">Мой диск</a>
+                <a href="{% url 'shares:new' %}" class="nav-link {% if request.resolver_match.url_name == 'new' %}active{% endif %}">Новый шейр</a>
+                <a href="{% url 'core:api_docs' %}" class="nav-link {% if request.resolver_match.url_name == 'api_docs' or request.resolver_match.url_name == 'info' %}active{% endif %}">API</a>
+            </nav>
+        </div>
+
+        <div class="nav-right">
+            {% if request.user.is_authenticated %}
+                <button type="button" id="userMenuBtn" class="user-pill">
+                    <span class="avatar-circle">
+                        {% if request.user.profile.avatar %}
+                            <img src="{{ request.user.profile.avatar.url }}" alt="{{ request.user.username }}">
+                        {% else %}
+                            {{ request.user.username|slice:":2"|upper }}
+                        {% endif %}
+                    </span>
+                    <span style="font-size:13px;font-weight:500;">{{ request.user.username }}</span>
+                </button>
+
+                <div id="userDropdown" class="user-dropdown">
+                    <a href="{% url 'accounts:profile' request.user.username %}" class="dropdown-item">Профиль</a>
+                    <a href="{% url 'drive:root' %}" class="dropdown-item">Мой диск</a>
+                    <a href="{% url 'shares:new' %}" class="dropdown-item">Создать шейр</a>
+                    {% if request.user.is_superuser %}
+                    <a href="/admin/" class="dropdown-item">Админ-панель</a>
+                    {% endif %}
+                    <div class="dropdown-sep"></div>
+                    <form method="post" action="{% url 'accounts:logout' %}">
+                        {% csrf_token %}
+                        <button type="submit" class="dropdown-item danger">Выйти</button>
+                    </form>
+                </div>
+            {% else %}
+                <a href="{% url 'accounts:sign_in' %}" class="btn btn-sm">Войти</a>
+                <a href="{% url 'accounts:sign_up' %}" class="btn btn-primary btn-sm">Регистрация</a>
+            {% endif %}
+
+            <button type="button" id="mobileMenuBtn" class="mobile-menu-btn" aria-label="Меню">☰</button>
+        </div>
+    </div>
+
+    <div id="mobileDrawer" class="mobile-drawer">
+        <a href="{% url 'core:home' %}" class="nav-link">Главная</a>
+        <a href="{% url 'drive:root' %}" class="nav-link">Мой диск</a>
+        <a href="{% url 'shares:new' %}" class="nav-link">Новый шейр</a>
+        <a href="{% url 'core:api_docs' %}" class="nav-link">API</a>
+    </div>
+</header>

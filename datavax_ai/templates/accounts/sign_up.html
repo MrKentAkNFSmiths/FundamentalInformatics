@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Регистрация — DataVax{% endblock %}
+
+{% block content %}
+<div class="auth-wrap">
+    <div class="card auth-card">
+        <div class="auth-header">
+            <h1>Создать аккаунт</h1>
+            <p class="muted" style="font-size:13px;">Автоматически создадим ваш корневой диск на 500 МБ</p>
+        </div>
+
+        <form method="post" action="{% url 'accounts:sign_up' %}" class="auth-form" id="registerForm">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="flash-banner error">
+                <span>{{ form.non_field_errors.0 }}</span>
+            </div>
+            {% endif %}
+
+            <div class="field-group">
+                <label for="username" class="field-label">{{ form.username.label }}</label>
+                {{ form.username }}
+                <span id="usernameFeedback" class="field-error">{% if form.username.errors %}{{ form.username.errors.0 }}{% endif %}</span>
+            </div>
+
+            <div class="field-group">
+                <label for="email" class="field-label">{{ form.email.label }}</label>
+                {{ form.email }}
+                <span id="emailFeedback" class="field-error">{% if form.email.errors %}{{ form.email.errors.0 }}{% endif %}</span>
+            </div>
+
+            <div class="field-group">
+                <label for="password1" class="field-label">{{ form.password1.label }}</label>
+                {{ form.password1 }}
+                <span id="password1Feedback" class="field-error">{% if form.password1.errors %}{{ form.password1.errors.0 }}{% endif %}</span>
+            </div>
+
+            <div class="field-group">
+                <label for="password2" class="field-label">{{ form.password2.label }}</label>
+                {{ form.password2 }}
+                <span id="password2Feedback" class="field-error">{% if form.password2.errors %}{{ form.password2.errors.0 }}{% endif %}</span>
+            </div>
+
+            <button type="submit" id="registerSubmitBtn" class="btn btn-primary" style="width:100%;">Зарегистрироваться</button>
+        </form>
+
+        <p class="muted" style="text-align:center;margin-top:16px;font-size:13px;">
+            Уже есть аккаунт? <a href="{% url 'accounts:sign_in' %}" style="color:var(--accent);">Войти</a>
+        </p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/auth.js' %}"></script>
+{% endblock %}

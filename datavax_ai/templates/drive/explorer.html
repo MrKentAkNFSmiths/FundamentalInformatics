@@ -1,0 +1,290 @@
+{% extends 'base.html' %}
+{% load static datavax_tags %}
+
+{% block title %}{{ current_folder.name }} — Мой диск | DataVax{% endblock %}
+
+{% block content %}
+<div class="drive-layout">
+    <aside class="card drive-sidebar">
+        <div class="drive-actions-col">
+            <input type="file" id="driveFileInput" class="hidden" multiple>
+            <button type="button" id="triggerUploadBtn" class="btn btn-primary">+ Загрузить файлы</button>
+            <button type="button" id="openNewFolderBtn" class="btn">+ Новая папка</button>
+            <button type="button" id="openNewNoteBtn" class="btn">+ Заметка / Код</button>
+        </div>
+
+        <nav class="sidebar-nav-list">
+            <a href="{% url 'drive:root' %}" class="sidebar-nav-item {% if not filter_mode and current_folder.is_root %}active{% endif %}">
+                <span>🏠</span><span>Все файлы</span>
+            </a>
+            <a href="{% url 'drive:root' %}?filter=starred" class="sidebar-nav-item {% if filter_mode == 'starred' %}active{% endif %}">
+                <span>★</span><span>Избранное</span>
+            </a>
+            <a href="{% url 'drive:root' %}?filter=recent" class="sidebar-nav-item {% if filter_mode == 'recent' %}active{% endif %}">
+                <span>🕒</span><span>Недавние</span>
+            </a>
+        </nav>
+
+        <div>
+            <div class="section-label">Дерево папок</div>
+            <div class="folder-tree">
+                {% include 'drive/includes/folder_tree.html' with nodes=folder_tree %}
+            </div>
+        </div>
+
+        <div class="quota-box">
+            <div style="display:flex;justify-content:space-between;font-size:12px;">
+                <span class="muted">Хранилище</span>
+                <span class="mono">{{ profile.storage_usage_percent }}%</span>
+            </div>
+            <div class="quota-bar">
+                <div class="quota-bar-fill" style="width:{{ profile.storage_usage_percent }}%;"></div>
+            </div>
+            <div class="muted mono" style="font-size:11px;">
+                {{ profile.used_storage_bytes|format_bytes }} из {{ profile.storage_quota|format_bytes }}
+            </div>
+        </div>
+    </aside>
+
+    <section class="drive-main">
+        <div class="card drive-toolbar">
+            <div class="breadcrumbs">
+                {% if filter_mode == 'starred' %}
+                    <span class="breadcrumb-link current">★ Избранное</span>
+                {% elif filter_mode == 'recent' %}
+                    <span class="breadcrumb-link current">🕒 Недавние файлы</span>
+                {% elif search_query %}
+                    <a href="{% url 'drive:root' %}" class="breadcrumb-link">Мой диск</a>
+                    <span class="muted">/</span>
+                    <span class="breadcrumb-link current">Поиск: «{{ search_query }}»</span>
+                {% else %}
+                    {% for crumb in breadcrumbs %}
+                        {% if not forloop.first %}<span class="muted">/</span>{% endif %}
+                        <a href="{% url 'drive:folder' crumb.uuid %}" class="breadcrumb-link {% if forloop.last %}current{% endif %}">
+                            {{ crumb.name }}
+                        </a>
+                    {% endfor %}
+                {% endif %}
+            </div>
+
+            <div class="toolbar-controls">
+                <form method="get" action="{% url 'drive:folder' current_folder.uuid %}" class="search-form">
+                    <input type="search" name="q" value="{{ search_query }}" placeholder="Поиск на диске..." class="input-field" style="width:190px;padding:7px 10px;">
+                    <select name="sort" class="select-field" style="width:auto;padding:7px 10px;" onchange="this.form.submit()">
+                        <option value="date" {% if sort_by == 'date' %}selected{% endif %}>По дате</option>
+                        <option value="name" {% if sort_by == 'name' %}selected{% endif %}>По имени</option>
+                        <option value="size" {% if sort_by == 'size' %}selected{% endif %}>По размеру</option>
+                    </select>
+                </form>
+
+                <button type="button" id="viewModeToggleBtn" class="btn btn-sm" title="Переключить вид">Список / Сетка</button>
+                {% if not is_filtered_view %}
+                <a href="{% url 'drive:download_folder_zip' current_folder.uuid %}" class="btn btn-sm">Скачать ZIP</a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div id="driveWorkspace" class="card drive-drop-area" data-folder-uuid="{{ current_folder.uuid }}" data-upload-url="{% url 'drive:upload_files' %}">
+            {% if subfolders %}
+            <div class="section-label">Папки ({{ subfolders|length }})</div>
+            <div class="folders-grid">
+                {% for folder in subfolders %}
+                <div class="folder-card">
+                    <a href="{% url 'drive:folder' folder.uuid %}" class="folder-card-link">
+                        <span style="font-size:18px;">📁</span>
+                        <span class="folder-name" title="{{ folder.name }}">{{ folder.name }}</span>
+                    </a>
+                    <div style="display:flex;gap:4px;flex-shrink:0;">
+                        <a href="{% url 'drive:download_folder_zip' folder.uuid %}" class="btn btn-sm btn-icon" title="Скачать ZIP">↓</a>
+                        <button type="button" class="btn btn-sm btn-icon" title="Переименовать" data-rename-url="{% url 'drive:rename_folder' folder.uuid %}" data-current-name="{{ folder.name }}">✎</button>
+                        <button type="button" class="btn btn-sm btn-icon" title="Переместить" data-move-url="{% url 'drive:move_folder' folder.uuid %}">⇄</button>
+                        <button type="button" class="btn btn-danger btn-sm btn-icon" title="Удалить" data-delete-url="{% url 'drive:delete_folder' folder.uuid %}" data-item-name="{{ folder.name }}">✕</button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if files %}
+            <div class="section-label">Файлы ({{ files|length }})</div>
+            <div id="filesGrid" class="files-grid">
+                {% for df in files %}
+                <article class="file-card">
+                    <div class="file-card-top">
+                        <a href="{% url 'drive:preview_file' df.uuid %}" class="file-title-link" title="{{ df.name }}">
+                            <span class="file-ext-pill">{{ df.name|file_ext }}</span>
+                            <span class="file-name-text">{{ df.name }}</span>
+                        </a>
+                        <button type="button" class="star-btn {% if df.is_starred %}starred{% endif %}" data-star-url="{% url 'drive:toggle_star' df.uuid %}" title="В избранное">★</button>
+                    </div>
+
+                    <div class="file-meta-row">
+                        <span class="mono">{{ df.size|format_bytes }}</span>
+                        <span>{{ df.updated_at|date:"d.m.Y H:i" }}</span>
+                    </div>
+
+                    <div class="file-actions-row">
+                        <a href="{% url 'drive:preview_file' df.uuid %}" class="btn btn-sm">Открыть</a>
+                        <a href="{% url 'drive:download_file' df.uuid %}" class="btn btn-sm">Скачать</a>
+                        <button type="button" class="btn btn-sm" data-share-url="{% url 'drive:share_file' df.uuid %}" data-item-name="{{ df.name }}">Поделиться</button>
+                        <button type="button" class="btn btn-sm btn-icon" title="Переименовать" data-rename-url="{% url 'drive:rename_file' df.uuid %}" data-current-name="{{ df.name }}">✎</button>
+                        <button type="button" class="btn btn-sm btn-icon" title="Переместить" data-move-url="{% url 'drive:move_file' df.uuid %}">⇄</button>
+                        <button type="button" class="btn btn-danger btn-sm btn-icon" title="Удалить" data-delete-url="{% url 'drive:delete_file' df.uuid %}" data-item-name="{{ df.name }}">✕</button>
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if not subfolders and not files %}
+            <div class="empty-state">
+                <div style="font-size:34px;">☁️</div>
+                <strong style="color:var(--text);">Здесь пока пусто</strong>
+                <p style="max-width:360px;font-size:13px;">Перетащите файлы прямо в это окно или создайте новую папку или заметку с кодом.</p>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+</div>
+
+<!-- Modal: New Folder -->
+<div id="newFolderModal" class="modal-backdrop">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3>Новая папка</h3>
+            <button type="button" class="btn btn-sm btn-icon" data-close-modal="newFolderModal">✕</button>
+        </div>
+        <form id="newFolderForm" method="post" action="{% url 'drive:create_folder' %}">
+            {% csrf_token %}
+            <input type="hidden" name="parent_uuid" value="{{ current_folder.uuid }}">
+            <div class="field-group">
+                <label class="field-label" for="newFolderName">Название папки</label>
+                <input type="text" id="newFolderName" name="name" class="input-field" placeholder="Например: Анапа2014 или Проект" required>
+            </div>
+            <div class="modal-footer" style="margin-top:14px;">
+                <button type="button" class="btn btn-sm" data-close-modal="newFolderModal">Отмена</button>
+                <button type="submit" class="btn btn-primary btn-sm">Создать</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: New Note / Code -->
+<div id="newNoteModal" class="modal-backdrop">
+    <div class="modal-card" style="max-width:560px;">
+        <div class="modal-header">
+            <h3>Создать файл / код на диске</h3>
+            <button type="button" class="btn btn-sm btn-icon" data-close-modal="newNoteModal">✕</button>
+        </div>
+        <form id="newNoteForm" method="post" action="{% url 'drive:create_note' %}" style="display:flex;flex-direction:column;gap:12px;">
+            {% csrf_token %}
+            <input type="hidden" name="folder_uuid" value="{{ current_folder.uuid }}">
+            <div class="field-group">
+                <label class="field-label" for="noteFilenameInput">Имя файла с расширением</label>
+                <input type="text" id="noteFilenameInput" name="filename" class="input-field mono" placeholder="main.py" required>
+            </div>
+            <div class="field-group">
+                <label class="field-label" for="noteContentInput">Содержимое</label>
+                <textarea id="noteContentInput" name="content" class="textarea-field mono" rows="8" placeholder="print('Hello, DataVax!')"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-sm" data-close-modal="newNoteModal">Отмена</button>
+                <button type="submit" class="btn btn-primary btn-sm">Создать и открыть</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Rename -->
+<div id="renameModal" class="modal-backdrop">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3>Переименовать</h3>
+            <button type="button" class="btn btn-sm btn-icon" data-close-modal="renameModal">✕</button>
+        </div>
+        <form id="renameForm" method="post">
+            {% csrf_token %}
+            <div class="field-group">
+                <label class="field-label" for="renameInput">Новое название</label>
+                <input type="text" id="renameInput" name="name" class="input-field" required>
+            </div>
+            <div class="modal-footer" style="margin-top:14px;">
+                <button type="button" class="btn btn-sm" data-close-modal="renameModal">Отмена</button>
+                <button type="submit" class="btn btn-primary btn-sm">Сохранить</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Move -->
+<div id="moveModal" class="modal-backdrop">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3>Переместить в папку</h3>
+            <button type="button" class="btn btn-sm btn-icon" data-close-modal="moveModal">✕</button>
+        </div>
+        <form id="moveForm" method="post">
+            {% csrf_token %}
+            <div class="field-group">
+                <label class="field-label" for="moveTargetSelect">Папка назначения</label>
+                <select id="moveTargetSelect" name="target_uuid" class="select-field">
+                    {% for target in move_targets %}
+                    <option value="{{ target.uuid }}">{{ target.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="modal-footer" style="margin-top:14px;">
+                <button type="button" class="btn btn-sm" data-close-modal="moveModal">Отмена</button>
+                <button type="submit" class="btn btn-primary btn-sm">Переместить</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Share Drive File -->
+<div id="driveShareModal" class="modal-backdrop">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3>Поделиться файлом</h3>
+            <button type="button" class="btn btn-sm btn-icon" data-close-modal="driveShareModal">✕</button>
+        </div>
+        <form id="driveShareForm" method="post" style="display:flex;flex-direction:column;gap:12px;">
+            {% csrf_token %}
+            <div class="field-group">
+                <label class="field-label" for="driveShareTitle">Заголовок</label>
+                <input type="text" id="driveShareTitle" name="title" class="input-field" required>
+            </div>
+            <div class="field-group">
+                <label class="field-label" for="driveShareExpire">Срок действия</label>
+                <select id="driveShareExpire" name="expire_preset" class="select-field">
+                    <option value="1h">1 час</option>
+                    <option value="1d">1 день</option>
+                    <option value="1w" selected>1 неделя</option>
+                    <option value="1m">1 месяц</option>
+                    <option value="never">Бессрочно</option>
+                </select>
+            </div>
+            <div class="field-group">
+                <label class="field-label" for="driveSharePassword">Пароль (необязательно)</label>
+                <input type="password" id="driveSharePassword" name="password" class="input-field" placeholder="Оставьте пустым для открытого доступа">
+            </div>
+            <label class="switch-row">
+                <span style="font-size:13px;">Скрыть автора (анонимно)</span>
+                <input type="checkbox" name="is_anonymous" value="true">
+            </label>
+            <div id="driveShareResult" class="hidden" style="display:flex;gap:6px;">
+                <input type="text" id="driveShareLinkInput" class="input-field mono" readonly>
+                <button type="button" id="copyDriveShareBtn" class="btn btn-sm">Копировать</button>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-sm" data-close-modal="driveShareModal">Закрыть</button>
+                <button type="submit" class="btn btn-primary btn-sm">Создать ссылку</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/drive.js' %}"></script>
+{% endblock %}

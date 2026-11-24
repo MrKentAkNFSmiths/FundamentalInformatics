@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+
+{% block title %}Срок действия истёк — DataVax{% endblock %}
+
+{% block content %}
+<div class="auth-wrap">
+    <div class="card auth-card" style="text-align:center;">
+        <div style="font-size:38px;margin-bottom:8px;">⏳</div>
+        <h1 style="font-size:22px;margin-bottom:8px;">Срок действия ссылки истёк</h1>
+        <p class="muted" style="margin-bottom:20px;">
+            Файл «{{ share.title }}» больше недоступен для просмотра и скачивания, так как время хранения закончилось.
+        </p>
+        <div style="display:flex;justify-content:center;gap:10px;">
+            <a href="{% url 'core:home' %}" class="btn">На главную</a>
+            <a href="{% url 'shares:new' %}" class="btn btn-primary">Создать новый шейр</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+
+{% block title %}Вход — DataVax{% endblock %}
+
+{% block content %}
+<div class="auth-wrap">
+    <div class="card auth-card">
+        <div class="auth-header">
+            <h1>Вход в DataVax</h1>
+            <p class="muted" style="font-size:13px;">Откройте доступ к личному диску и вашим шейрам</p>
+        </div>
+
+        <form method="post" action="{% url 'accounts:sign_in' %}" class="auth-form">
+            {% csrf_token %}
+            {% if next %}
+            <input type="hidden" name="next" value="{{ next }}">
+            {% endif %}
+
+            {% if form.non_field_errors %}
+            <div class="flash-banner error">
+                <span>{{ form.non_field_errors.0 }}</span>
+            </div>
+            {% endif %}
+
+            <div class="field-group">
+                <label for="username" class="field-label">{{ form.username.label }}</label>
+                {{ form.username }}
+                {% if form.username.errors %}
+                <span class="field-error">{{ form.username.errors.0 }}</span>
+                {% endif %}
+            </div>
+
+            <div class="field-group">
+                <label for="password" class="field-label">{{ form.password.label }}</label>
+                {{ form.password }}
+                {% if form.password.errors %}
+                <span class="field-error">{{ form.password.errors.0 }}</span>
+                {% endif %}
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width:100%;">Войти</button>
+        </form>
+
+        <p class="muted" style="text-align:center;margin-top:16px;font-size:13px;">
+            Ещё нет аккаунта? <a href="{% url 'accounts:sign_up' %}" style="color:var(--accent);">Зарегистрироваться</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

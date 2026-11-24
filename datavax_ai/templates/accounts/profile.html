@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+{% load static datavax_tags %}
+
+{% block title %}{{ profile_user.username }} — Профиль | DataVax{% endblock %}
+
+{% block content %}
+<div class="profile-wrap">
+    <section class="card profile-hero">
+        <div
+            id="profileAvatarBox"
+            class="profile-avatar-box {% if is_owner %}editable{% endif %}"
+            {% if is_owner %}data-upload-url="{% url 'accounts:upload_avatar' profile_user.username %}"{% endif %}
+        >
+            {% if profile.avatar %}
+                <img src="{{ profile.avatar.url }}" alt="{{ profile_user.username }}">
+            {% else %}
+                <span>{{ profile_user.username|slice:":2"|upper }}</span>
+            {% endif %}
+            {% if is_owner %}
+                <div class="profile-avatar-overlay">Изменить</div>
+                <input type="file" id="avatarUploadInput" accept="image/*" class="hidden">
+            {% endif %}
+        </div>
+
+        <div style="flex:1;min-width:220px;">
+            <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:6px;">
+                <h1 style="font-size:24px;">{{ profile_user.username }}</h1>
+                {% if is_owner %}
+                    <button type="button" id="editProfileBtn" class="btn btn-sm">Редактировать профиль</button>
+                    <a href="{% url 'drive:root' %}" class="btn btn-primary btn-sm">Открыть диск</a>
+                {% endif %}
+            </div>
+            {% if profile.bio %}
+                <p class="muted" style="margin-bottom:6px;">{{ profile.bio }}</p>
+            {% endif %}
+            {% if is_owner or request.user.is_superuser %}
+                <div class="mono muted" style="font-size:12px;">{{ profile_user.email }}</div>
+            {% endif %}
+        </div>
+    </section>
+
+    {% if is_owner %}
+    <section id="profileEditPanel" class="card hidden" style="padding:20px;">
+        <form id="profileEditForm" data-update-url="{% url 'accounts:update_profile' profile_user.username %}" style="display:flex;flex-direction:column;gap:14px;">
+            <div class="field-group">
+                <label class="field-label" for="nicknameInput">Имя пользователя</label>
+                <input type="text" id="nicknameInput" name="nickname" class="input-field" value="{{ profile_user.username }}" required>
+            </div>
+            <div class="field-group">
+                <label class="field-label" for="bioInput">О себе</label>
+                <textarea id="bioInput" name="bio" class="textarea-field" maxlength="300" placeholder="Краткое описание профиля...">{{ profile.bio }}</textarea>
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;">
+                <button type="button" id="cancelProfileEditBtn" class="btn btn-sm">Отмена</button>
+                <button type="submit" class="btn btn-primary btn-sm">Сохранить</button>
+            </div>
+        </form>
+    </section>
+    {% endif %}
+
+    <section class="profile-stats-grid">
+        <div class="card stat-card">
+            <div class="muted" style="font-size:12px;">Шейры</div>
+            <div class="stat-value">{{ shares_list|length }}</div>
+        </div>
+        <div class="card stat-card">
+            <div class="muted" style="font-size:12px;">Лайки</div>
+            <div class="stat-value">{{ total_likes }}</div>
+        </div>
+        <div class="card stat-card">
+            <div class="muted" style="font-size:12px;">{% if is_owner %}Место на диске{% else %}Файлов на диске{% endif %}</div>
+            {% if is_owner %}
+                <div class="stat-value" style="font-size:16px;">{{ profile.used_storage_bytes|format_bytes }} / {{ profile.storage_quota|format_bytes }}</div>
+                <div class="quota-bar" style="margin-top:8px;">
+                    <div class="quota-bar-fill" style="width:{{ profile.storage_usage_percent }}%;"></div>
+                </div>
+            {% else %}
+                <div class="stat-value">{{ drive_files_count }}</div>
+            {% endif %}
+        </div>
+    </section>
+
+    <section>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+            <h2 style="font-size:18px;">{% if is_owner %}Мои шейры{% else %}Публичные шейры{% endif %}</h2>
+            {% if is_owner %}
+            <a href="{% url 'shares:new' %}" class="btn btn-sm">+ Новый шейр</a>
+            {% endif %}
+        </div>
+
+        {% if shares_list %}
+        <div class="shares-grid">
+            {% for share in shares_list %}
+            <article class="card share-card">
+                <div>
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px;">
+                        <a href="{% url 'shares:detail' share.hash_id %}" style="font-weight:600;color:var(--accent);word-break:break-word;">
+                            {{ share.title }}
+                        </a>
+                        <span class="badge">{{ share.asset.original_name|file_ext }}</span>
+                    </div>
+                    {% if share.description %}
+                        <p class="muted" style="font-size:12px;margin-bottom:8px;">{{ share.description|truncatechars:100 }}</p>
+                    {% endif %}
+                    <div class="muted mono" style="font-size:11px;">
+                        {{ share.asset.size|format_bytes }} · {{ share.created_at|date:"d.m.Y H:i" }} · ↓ {{ share.downloads_count }}
+                    </div>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+                        {% if share.has_password %}<span class="badge badge-warning">Пароль</span>{% endif %}
+                        {% if share.is_anonymous %}<span class="badge">Анонимно</span>{% endif %}
+                        {% if share.is_expired %}<span class="badge badge-danger">Истёк</span>{% endif %}
+                    </div>
+                </div>
+
+                <div style="display:flex;gap:6px;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--border);">
+                    <a href="{% url 'shares:detail' share.hash_id %}" class="btn btn-sm">Открыть</a>
+                    <button type="button" class="btn btn-sm" data-copy-text="{{ request.scheme }}://{{ request.get_host }}{% url 'shares:detail' share.hash_id %}">Копировать</button>
+                    {% if is_owner %}
+                    <button
+                        type="button"
+                        class="btn btn-danger btn-sm"
+                        data-delete-share-url="{% url 'shares:delete' share.hash_id %}"
+                        data-share-title="{{ share.title }}"
+                    >Удалить</button>
+                    {% endif %}
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="card empty-state">
+            <p>Пока нет опубликованных шейров.</p>
+            {% if is_owner %}
+            <a href="{% url 'shares:new' %}" class="btn btn-primary btn-sm">Создать первый шейр</a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/profile.js' %}"></script>
+{% endblock %}

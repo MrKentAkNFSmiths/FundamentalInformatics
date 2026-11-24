@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+{% load static datavax_tags %}
+
+{% block title %}DataVax — Облачный диск и быстрый шеринг{% endblock %}
+
+{% block content %}
+<section class="hero-grid">
+    <div>
+        <div class="hero-eyebrow">DataVax v2 · Облако + Шеринг + REST API</div>
+        <h1 class="hero-title">Личный облачный диск и мгновенный обмен кодом и файлами</h1>
+        <p class="hero-subtitle">
+            Храните папки и проекты в структурированном диске, редактируйте код в браузере, скачивайте целые каталоги в ZIP и делитесь защищёнными ссылками с таймером удаления.
+        </p>
+        <div class="hero-actions">
+            {% if request.user.is_authenticated %}
+                <a href="{% url 'drive:root' %}" class="btn btn-primary">Открыть Мой диск</a>
+            {% else %}
+                <a href="{% url 'accounts:sign_up' %}" class="btn btn-primary">Создать свой диск</a>
+            {% endif %}
+            <a href="{% url 'shares:new' %}" class="btn">Новый шейр / Редактор кода</a>
+            <button type="button" id="formatsToggleBtn" class="btn">Поддерживаемые форматы</button>
+        </div>
+
+        {% if request.user.is_authenticated %}
+        <div class="card" style="margin-top:20px;padding:14px 16px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;">
+            <div>
+                <div style="font-weight:600;">Ваше хранилище: {{ drive_files_count }} файл(ов)</div>
+                <div class="muted" style="font-size:12px;">
+                    Использовано {{ profile.used_storage_bytes|format_bytes }} из {{ profile.storage_quota|format_bytes }}
+                </div>
+            </div>
+            <a href="{% url 'accounts:profile' request.user.username %}" class="btn btn-sm">Профиль и шейры →</a>
+        </div>
+        {% endif %}
+    </div>
+
+    <div id="quickDropzone" class="quick-dropzone" data-upload-url="{% url 'shares:upload' %}">
+        <input type="file" id="quickFileInput" class="hidden">
+        <div class="quick-dropzone-icon">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+        </div>
+        <h2 style="font-size:17px;margin-bottom:6px;">Быстрый шейр в один клик</h2>
+        <p class="muted" style="font-size:13px;margin-bottom:14px;">
+            Перетащите любой файл до 100 МБ сюда или нажмите, чтобы мгновенно получить короткую ссылку на 24 часа.
+        </p>
+        <span class="badge badge-accent">Drag & Drop · Без перезагрузки</span>
+    </div>
+</section>
+
+<div id="formatsDrawer" class="card formats-drawer hidden">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+        <strong>Форматы с предпросмотром в браузере (хранить можно любые типы)</strong>
+        <span class="badge">до 100 МБ / файл</span>
+    </div>
+    <div class="formats-columns">
+        {% for group in format_groups %}
+        <div>
+            <div class="muted" style="font-size:12px;font-weight:600;">{{ group.title }}</div>
+            <div class="format-chips">
+                {% for ext in group.items %}
+                <span class="badge">{{ ext }}</span>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<section class="feature-grid">
+    <article class="card feature-card">
+        <h3>Древовидный облачный диск</h3>
+        <p>Вложенные папки, загрузка нескольких файлов, избранное, поиск по дискам и экспорт любой папки в ZIP-архив.</p>
+    </article>
+    <article class="card feature-card">
+        <h3>Редактор и безопасный шеринг</h3>
+        <p>Подсветка 14+ языков в CodeMirror, хешированные пароли доступа, автоудаление по таймеру и загрузка по URL.</p>
+    </article>
+    <article class="card feature-card">
+        <h3>REST API для CLI и скриптов</h3>
+        <p>Отправляйте файлы одной командой <code class="mono">curl</code> и интегрируйте DataVax в свои пайплайны.</p>
+    </article>
+</section>
+
+<section class="card" style="padding:18px;">
+    <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;">
+        <strong>Быстрая загрузка из терминала</strong>
+        <a href="{% url 'core:api_docs' %}" class="btn btn-sm">Полная документация API →</a>
+    </div>
+    <pre class="code-snippet-box">curl -F "file=@main.py" -F "title=Demo snippet" -F "expires=24" "{{ request.scheme }}://{{ request.get_host }}/api/upload/?plain=1"</pre>
+</section>
+
+{% if recent_shares %}
+<section style="margin-top:24px;">
+    <h2 style="font-size:16px;margin-bottom:12px;">Ваши недавние шейры</h2>
+    <div class="shares-grid">
+        {% for share in recent_shares %}
+        <a href="{% url 'shares:detail' share.hash_id %}" class="card share-card">
+            <div>
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;">
+                    <strong style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ share.title }}</strong>
+                    <span class="badge">{{ share.asset.original_name|file_ext }}</span>
+                </div>
+                <div class="muted" style="font-size:12px;">{{ share.asset.size|format_bytes }} · {{ share.created_at|date:"d.m.Y H:i" }}</div>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                {% if share.has_password %}<span class="badge badge-warning">Пароль</span>{% endif %}
+                {% if share.is_anonymous %}<span class="badge">Анонимно</span>{% endif %}
+                {% if share.is_expired %}<span class="badge badge-danger">Истёк</span>{% endif %}
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/home.js' %}"></script>
+{% endblock %}

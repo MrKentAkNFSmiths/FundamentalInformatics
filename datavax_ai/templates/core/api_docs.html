@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+
+{% block title %}REST API — DataVax{% endblock %}
+
+{% block content %}
+<div class="share-detail-wrap">
+    <div class="card" style="padding:24px;">
+        <div class="hero-eyebrow" style="margin-bottom:10px;">DataVax REST API v2</div>
+        <h1 style="font-size:24px;margin-bottom:8px;">Документация по API и интеграциям</h1>
+        <p class="muted">
+            Загружайте файлы с компьютера или по публичной URL-ссылке, защищайте их паролем и управляйте личным диском из терминала или ваших программ.
+        </p>
+    </div>
+
+    <div class="card" style="padding:20px;display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <span class="badge badge-success">POST</span>
+            <code class="mono">/api/upload/</code>
+            <span class="muted">Создать публичный шейр (файл или URL)</span>
+        </div>
+        <p class="muted" style="font-size:13px;">
+            Параметры <code class="mono">multipart/form-data</code> или JSON: <code class="mono">file</code> или <code class="mono">url</code>, <code class="mono">title</code>, <code class="mono">description</code>, <code class="mono">password</code>, <code class="mono">expires</code> (часы от 1 до 720). Добавьте <code class="mono">?plain=1</code> чтобы получить ответ одной строкой.
+        </p>
+        <pre class="code-snippet-box">curl -X POST "{{ base_url }}/api/upload/" \
+  -F "file=@example.py" \
+  -F "title=Лабораторная работа" \
+  -F "password=secret123" \
+  -F "expires=48"</pre>
+    </div>
+
+    <div class="card" style="padding:20px;display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <span class="badge badge-accent">GET</span>
+            <code class="mono">/api/download/&lt;hash_id&gt;/</code>
+            <span class="muted">Скачать файл по идентификатору</span>
+        </div>
+        <p class="muted" style="font-size:13px;">
+            Для защищённых шейров передайте пароль через заголовок <code class="mono">X-Share-Password</code> (рекомендуется) или query-параметр <code class="mono">?password=...</code>.
+        </p>
+        <pre class="code-snippet-box">curl -L -H "X-Share-Password: secret123" "{{ base_url }}/api/download/ab12cd34/" -o example.py</pre>
+    </div>
+
+    <div class="card" style="padding:20px;display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <span class="badge badge-accent">GET</span>
+            <span class="badge badge-danger">DELETE</span>
+            <code class="mono">/api/shares/&lt;hash_id&gt;/</code>
+            <span class="muted">Метаданные или удаление шейра владельцем</span>
+        </div>
+        <pre class="code-snippet-box">curl "{{ base_url }}/api/shares/ab12cd34/"</pre>
+    </div>
+
+    <div class="card" style="padding:20px;display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <span class="badge badge-accent">GET / POST</span>
+            <code class="mono">/api/drive/</code>
+            <code class="mono">/api/drive/upload/</code>
+            <span class="muted">Операции с личным облачным диском (с авторизацией)</span>
+        </div>
+        <pre class="code-snippet-box">curl -u username:password "{{ base_url }}/api/drive/"</pre>
+    </div>
+</div>
+{% endblock %}

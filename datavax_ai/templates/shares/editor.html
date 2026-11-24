@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Новый шейр — DataVax{% endblock %}
+
+{% block extra_css %}
+{% include 'includes/codemirror_assets.html' with mode='css' %}
+{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:18px;">
+    <h1 style="font-size:22px;margin-bottom:4px;">Создать новый шейр</h1>
+    <p class="muted" style="font-size:13px;">Поделитесь фрагментом кода, файлом с устройства или документом по прямой URL-ссылке</p>
+</div>
+
+<div class="editor-layout">
+    <section class="card editor-main-card">
+        <div class="editor-tabs">
+            <button type="button" class="tab-btn active" data-editor-tab="code">Редактор кода</button>
+            <button type="button" class="tab-btn" data-editor-tab="file">Загрузка файла</button>
+            <button type="button" class="tab-btn" data-editor-tab="url">Импорт по URL</button>
+        </div>
+
+        <div id="tabPanelCode">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;">
+                <label class="field-label" for="languageSelect">Подсветка синтаксиса</label>
+                <select id="languageSelect" class="select-field" style="width:220px;">
+                    {% for value, label in languages %}
+                    <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <textarea id="codeEditorTextarea" data-max-bytes="{{ max_size_bytes }}"></textarea>
+        </div>
+
+        <div id="tabPanelFile" class="hidden">
+            <div id="editorFileDrop" class="quick-dropzone" style="min-height:360px;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                <input type="file" id="editorFileInput" class="hidden">
+                <div class="quick-dropzone-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                </div>
+                <strong style="margin-bottom:6px;">Перетащите файл сюда или нажмите для выбора</strong>
+                <span class="muted" style="font-size:13px;">Максимальный размер: {{ max_size_mb }} МБ</span>
+                <div id="editorFileSelected" class="badge badge-accent hidden" style="margin-top:14px;font-size:12px;"></div>
+            </div>
+        </div>
+
+        <div id="tabPanelUrl" class="hidden">
+            <div class="field-group" style="padding:20px 0;">
+                <label class="field-label" for="remoteUrlInput">Прямая HTTP/HTTPS ссылка на файл</label>
+                <input type="url" id="remoteUrlInput" class="input-field mono" placeholder="https://example.com/archive.zip">
+                <p class="muted" style="font-size:12px;">
+                    DataVax безопасно скачает файл (до {{ max_size_mb }} МБ) с проверкой сетевого адреса и создаст независимый шейр.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <aside class="card editor-meta-card">
+        <div class="field-group">
+            <label class="field-label" for="shareTitleInput">Название</label>
+            <input type="text" id="shareTitleInput" class="input-field" placeholder="Например: Решение задачи №3">
+        </div>
+
+        <div class="field-group">
+            <label class="field-label" for="shareDescriptionInput">Описание (необязательно)</label>
+            <textarea id="shareDescriptionInput" class="textarea-field" placeholder="Краткий комментарий к файлу..."></textarea>
+        </div>
+
+        <div class="field-group">
+            <label class="field-label" for="shareExpireSelect">Срок хранения</label>
+            <select id="shareExpireSelect" class="select-field">
+                <option value="10m">10 минут</option>
+                <option value="1h">1 час</option>
+                <option value="1d" selected>1 день</option>
+                <option value="1w">1 неделя</option>
+                <option value="1m">1 месяц</option>
+                <option value="never">Бессрочно</option>
+            </select>
+        </div>
+
+        <div class="field-group">
+            <label class="field-label" for="sharePasswordInput">Пароль доступа (необязательно)</label>
+            <div style="display:flex;gap:6px;">
+                <input type="password" id="sharePasswordInput" class="input-field" placeholder="Хранится в виде криптографического хеша">
+                <button type="button" id="togglePwdVisibility" class="btn btn-sm" title="Показать/скрыть">👁</button>
+            </div>
+        </div>
+
+        {% if request.user.is_authenticated %}
+        <label class="switch-row">
+            <span style="font-size:13px;">Опубликовать анонимно</span>
+            <input type="checkbox" id="shareAnonymousCheck">
+        </label>
+        <label class="switch-row">
+            <span style="font-size:13px;">Также сохранить в Мой диск</span>
+            <input type="checkbox" id="shareSaveDriveCheck">
+        </label>
+        {% else %}
+        <div class="badge" style="padding:8px 10px;border-radius:8px;justify-content:center;">
+            Публикация будет анонимной
+        </div>
+        {% endif %}
+
+        <button type="button" id="publishShareBtn" class="btn btn-primary" data-upload-url="{% url 'shares:upload' %}" style="width:100%;">
+            Опубликовать шейр
+        </button>
+    </aside>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% include 'includes/codemirror_assets.html' with mode='js' %}
+<script src="{% static 'js/editor.js' %}"></script>
+{% endblock %}
